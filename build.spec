@@ -2,12 +2,13 @@
 """
 PyInstaller spec file for PaddleOCR + PySide6 application.
 
-PaddlePaddle 3.0.0 版本已重构模块结构，paddle.fluid 模块已移除。
+使用 collect_all 递归收集所有子模块（包括动态 import），
+彻底解决 hiddenimports 遗漏导致的 ModuleNotFoundError。
 """
 
 import sys
 import os
-from PyInstaller.utils.hooks import collect_data_files, collect_submodules
+from PyInstaller.utils.hooks import collect_data_files, collect_submodules, collect_all
 
 block_cipher = None
 
@@ -17,292 +18,68 @@ datas = [
     ('config.py', '.'),
 ]
 
-# 尝试收集 paddle 和 paddleocr 的数据文件
-try:
-    datas += collect_data_files('paddleocr', include_py_files=False)
-except Exception:
-    pass
+# 收集第三方库的数据文件
+for pkg in ['paddleocr', 'paddle', 'shapely', 'pyclipper', 'psutil',
+            'openpyxl', 'tqdm', 'attr', 'lmdb', 'yaml']:
+    try:
+        datas += collect_data_files(pkg, include_py_files=False)
+    except Exception:
+        pass
 
-try:
-    datas += collect_data_files('paddle', include_py_files=False)
-except Exception:
-    pass
+# collect_all: 递归收集所有子模块，包括动态 import 的模块。
+# 注意：setuptools 不使用 collect_all，避免触发 vendored 依赖的 hooks 递归。
+# setuptools 59.8.0 使用 collect_submodules + 手动指定子模块代替。
+_collect_all = []
+for pkg in ['paddle', 'paddleocr', 'shapely', 'scipy', 'pyclipper',
+            'lmdb', 'pyyaml', 'tqdm', 'attrs', 'six', 'psutil',
+            'openpyxl', 'cv2', 'PIL']:
+    try:
+        _collected = collect_all(pkg)
+        if _collected:
+            _collect_all += _collected
+            print(f'collect_all({pkg}): {len(_collected)} submodules')
+    except Exception as e:
+        print(f'collect_all({pkg}) failed: {e}')
 
-try:
-    datas += collect_data_files('shapely', include_py_files=False)
-except Exception:
-    pass
+# 补充 collect_submodules（处理已知的子模块路径）
+# setuptools 使用 collect_submodules 而非 collect_all，避免触发 hooks 递归
+_collect_sub = []
+for pkg in ['numpy', 'pandas', 'setuptools', 'pkg_resources']:
+    try:
+        subs = collect_submodules(pkg)
+        _collect_sub += subs
+        print(f'collect_submodules({pkg}): {len(subs)} submodules')
+    except Exception as e:
+        print(f'collect_submodules({pkg}) failed: {e}')
 
-# PaddlePaddle 3.0 模块结构（不再使用 paddle.fluid）
-hiddenimports = [
-    # PaddlePaddle 3.0 核心
-    'paddle',
-    'paddle.base',
-    'paddle.base.core',
-    'paddle.base.framework',
-    'paddle.base.executor',
-    'paddle.inference',
-    'paddle.framework',
-    'paddle.framework.ir',
-    'paddle.tensor',
-    'paddle.device',
-    'paddle.dataset',
-    'paddle.reader',
-    'paddle.distributed',
-    
-    # PaddlePaddle NN 模块
-    'paddle.nn',
-    'paddle.nn.layer',
-    'paddle.nn.layer.layers',
-    'paddle.nn.layer.activation',
-    'paddle.nn.layer.conv',
-    'paddle.nn.layer.norm',
-    'paddle.nn.layer.linear',
-    'paddle.nn.layer.pooling',
-    'paddle.nn.layer.container',
-    'paddle.nn.functional',
-    'paddle.nn.initializer',
-    'paddle.nn.utils',
-    
-    # PaddlePaddle 其他模块
-    'paddle.optimizer',
-    'paddle.optimizer.optimizer',
-    'paddle.optimizer.lr',
-    'paddle.optimizer.lr.scheduler',
-    'paddle.loss',
-    'paddle.metric',
-    'paddle.autograd',
-    'paddle.jit',
-    'paddle.profiler',
-    'paddle.amp',
-    'paddle.quantization',
-    'paddle.sparse',
-    'paddle.linalg',
-    'paddle.math',
-    'paddle.io',
-    'paddle.io.dataset',
-    'paddle.io.loader',
-    'paddle.io.sampler',
-    'paddle._C_ops',
-    'paddle._C_sot',
-    
-    # PaddleOCR 模块
-    'paddleocr',
-    'paddleocr.paddleocr',
-    'paddleocr.ppocr',
-    'paddleocr.ppocr.utils',
-    'paddleocr.ppocr.utils.utility',
-    'paddleocr.ppocr.utils.logging',
-    'paddleocr.ppocr.utils.network',
-    'paddleocr.ppocr.utils.e2e_utils',
-    'paddleocr.ppocr.utils.e2e_utils.pgnet',
-    'paddleocr.ppocr.post_processing',
-    'paddleocr.ppocr.post_processing.db_postprocess',
-    'paddleocr.ppocr.data',
-    'paddleocr.ppocr.data.imaug',
-    'paddleocr.ppocr.data.imaug.operators',
-    'paddleocr.ppocr.data.dataset',
-    'paddleocr.ppocr.predict_system',
-    'paddleocr.ppocr.architecture',
-    'paddleocr.tools',
-    'paddleocr.tools.infer',
-    'paddleocr.tools.infer.utility',
-    
-    # 关键依赖
-    'shapely',
-    'shapely.geometry',
-    'shapely.geometry.polygon',
-    'shapely.geometry.base',
-    'shapely.ops',
-    'shapely.lib',
-    'pyclipper',
-    'psutil',
-    'scipy',
-    'scipy.spatial',
-    'scipy.spatial.qhull',
-    'scipy.special',
-    'scipy.sparse',
-    'scipy.linalg',
-    'scipy.ndimage',
-    'scipy.optimize',
-    'scipy.interpolate',
-    'six',
-    'lmdb',
-    'lmdb.c',
-    'pyyaml',
-    'yaml',
-    'tqdm',
-    'tqdm.auto',
-    'tqdm.std',
-    'attrs',
-    'attr',
-    
-    # 图像处理
-    'cv2',
-    'cv2.utils',
-    'PIL',
-    'PIL.Image',
-    'PIL.ImageFile',
-    'PIL._imaging',
-    
-    # 数值计算
-    'numpy',
-    'numpy.core',
-    'numpy.core.multiarray',
-    'numpy.core.umath',
-    'numpy.fft',
-    'numpy.linalg',
-    'numpy.lib',
-    'numpy.random',
-    
-    # 数据处理
-    'pandas',
-    'pandas._libs',
-    'pandas._libs.tslibs',
-    'pandas._libs.tslibs.base',
-    'pandas.core',
-    'pandas.core.api',
-    'pandas.core.frame',
-    'pandas.core.series',
-    'pandas.core.arrays',
-    'pandas.io',
-    'pandas.io.excel',
-    'pandas.io.formats',
-    'openpyxl',
-    'openpyxl.cell',
-    'openpyxl.cell.cell',
-    'openpyxl.styles',
-    'openpyxl.styles.alignment',
-    'openpyxl.styles.borders',
-    'openpyxl.styles.fills',
-    'openpyxl.styles.fonts',
-    'openpyxl.styles.numbers',
-    'openpyxl.workbook',
-    'openpyxl.workbook.workbook',
-    'openpyxl.worksheet',
-    'openpyxl.worksheet.worksheet',
-    'openpyxl.writer',
-    'openpyxl.writer.excel',
-    'openpyxl.utils',
-    'openpyxl.utils.cell',
-    
-    # PySide6
+# hiddenimports: collect_all + collect_submodules + 必须显式指定的模块
+hiddenimports = _collect_all + _collect_sub + [
+    # PySide6 — Qt 绑定
     'PySide6',
     'PySide6.QtCore',
     'PySide6.QtGui',
     'PySide6.QtWidgets',
     'PySide6.support',
 
-    # setuptools 59.8.0 — 正常分析，不 vendoring distutils
-    'setuptools',
-    'pkg_resources',
-
-    # 标准库（distutils/packaging 由 PyInstaller 正常分析）
-    'distutils',
-    'distutils.core',
-    'distutils.sysconfig',
-    'packaging',
-    'packaging.version',
-    'packaging.specifiers',
-    'packaging.requirements',
-
-    # 标准库
+    # 标准库中 PyInstaller 无法自动分析的模块
     'logging',
     'logging.config',
     'logging.handlers',
-    'pathlib',
-    'tempfile',
-    'shutil',
-    'json',
-    're',
-    'collections',
-    'collections.abc',
-    'typing',
-    'typing_extensions',
-    'threading',
+    'unittest',
+    'unittest.mock',
     'multiprocessing',
     'multiprocessing.context',
     'multiprocessing.pool',
     'multiprocessing.spawn',
-    'concurrent',
     'concurrent.futures',
     'concurrent.futures.thread',
     'concurrent.futures.process',
-    'queue',
-    'functools',
-    'itertools',
-    'operator',
-    'contextlib',
-    'contextlib._contextlib',
-    'warnings',
-    'traceback',
-    'copy',
-    'copyreg',
-    'pickle',
-    'struct',
-    'hashlib',
-    'random',
-    'math',
-    'cmath',
-    'time',
-    'datetime',
-    'calendar',
-    'zoneinfo',
-    'xml.etree.ElementTree',
-    'csv',
-    'argparse',
     'importlib',
     'importlib.abc',
     'importlib.machinery',
     'importlib.resources',
     'importlib.util',
-    'site',
-    'builtins',
-    'os',
-    'sys',
-    'platform',
-    'io',
-    'abc',
-    'dataclasses',
-    'inspect',
-    'dis',
-    'codecs',
-    'unicodedata',
-    'string',
-    'textwrap',
-    'difflib',
-    'hmac',
-    'secrets',
-    'statistics',
-    'array',
-    'ctypes',
-    'mmap',
-    'subprocess',
-    'signal',
-    'socket',
-    'select',
-    'selectors',
-    'ssl',
-    'urllib',
-    'urllib.parse',
-    'http',
-    'http.client',
-    'email',
-    'email.mime',
-    'html',
-    'html.parser',
-    'xml',
-    'xml.dom',
-    'xml.sax',
-    'zipfile',
-    'gzip',
-    'bz2',
-    'lzma',
-    'tarfile',
-    'configparser',
-    'gettext',
-    'locale',
-    'runpy',
+    'pkg_resources.extern',
 ]
 
 # 排除不需要的模块
@@ -359,8 +136,6 @@ excludes = [
     'aiohttp',
     'pytest',
     '_pytest',
-    'unittest',
-    'unittest.mock',
     'coverage',
     'hypothesis',
     'black',
