@@ -67,6 +67,14 @@ jobs:
           echo === paddle libs copied ===
           dir dist\handwritten-ocr\_internal\paddle\libs
 
+      - name: Copy setuptools (excluded from analysis, needed at runtime by paddle)
+        run: |
+          xcopy "%pythonLocation%\Lib\site-packages\setuptools" "dist\handwritten-ocr\_internal\setuptools\" /Y /I /E /Q
+          xcopy "%pythonLocation%\Lib\site-packages\pkg_resources" "dist\handwritten-ocr\_internal\pkg_resources\" /Y /I /E /Q
+          echo === setuptools copied ===
+          dir dist\handwritten-ocr\_internal\setuptools\__init__.py
+          dir dist\handwritten-ocr\_internal\pkg_resources\__init__.py
+
       - name: Create distribution archive
         run: |
           cd dist

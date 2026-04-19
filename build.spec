@@ -193,11 +193,7 @@ hiddenimports = [
     'PySide6.QtWidgets',
     'PySide6.support',
     
-    # paddle 运行时依赖的构建工具模块
-    'setuptools',
-    'setuptools.dist',
-    'setuptools.extension',
-    'pkg_resources',
+    # 标准库（distutils/packaging 由 PyInstaller 正常分析）
     'distutils',
     'distutils.core',
     'distutils.sysconfig',
@@ -380,6 +376,8 @@ excludes = [
     'nbconvert',
     'Cython',
     'cython',
+    'setuptools',  # 构建时排除（避免分析递归），构建后复制到产物目录
+    'pkg_resources',  # setuptools 子包，同上
     'wheel',
     'pip',
     'sphinx',
