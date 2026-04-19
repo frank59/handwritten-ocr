@@ -94,14 +94,19 @@ hiddenimports = _collect_all_hiddenimports + _collect_sub + [
 ]
 
 # 排除不需要的模块
+# 仅排除明确不需要的包，其余交给 collect_all/collect_submodules 自动收集
+# 避免逐个修补 ModuleNotFoundError
 excludes = [
+    # GUI 相关（应用不用 tkinter/matplotlib）
     'tkinter',
     'matplotlib',
     'mpl_toolkits',
+
+    # 大型 ML/AI 框架（应用不用）
     'torch',
+    'torchvision',
     'tensorflow',
     'keras',
-    'torchvision',
     'transformers',
     'huggingface_hub',
     'datasets',
@@ -110,27 +115,11 @@ excludes = [
     'langchain',
     'openai',
     'anthropic',
-    'boto3',
-    'botocore',
-    'awscli',
-    'google.cloud',
-    'googleapiclient',
-    'grpc',
-    'grpcio',
-    'docker',
-    'kubernetes',
     'ray',
     'dask',
     'distributed',
-    'prefect',
-    'airflow',
-    'celery',
-    'redis',
-    'pymongo',
-    'mysql',
-    'psycopg2',
-    'sqlalchemy',
-    'django',
+
+    # Web 框架（应用不用）
     'flask',
     'fastapi',
     'starlette',
@@ -138,12 +127,34 @@ excludes = [
     'gunicorn',
     'werkzeug',
     'jinja2',
+    'django',
     'selenium',
     'playwright',
-    'scrapy',
-    'bs4',
-    'beautifulsoup4',
-    'aiohttp',
+
+    # 数据库客户端（应用不用）
+    'pymongo',
+    'mysql',
+    'redis',
+    'psycopg2',
+    'sqlalchemy',
+
+    # 云 SDK（应用不用）
+    'boto3',
+    'botocore',
+    'awscli',
+    'google.cloud',
+    'googleapiclient',
+    'grpc',
+    'grpcio',
+
+    # 基础设施（应用不用）
+    'docker',
+    'kubernetes',
+    'prefect',
+    'airflow',
+    'celery',
+
+    # 开发/测试工具（不需要打入运行时）
     'pytest',
     '_pytest',
     'coverage',
@@ -155,6 +166,10 @@ excludes = [
     'isort',
     'tox',
     'nox',
+    'Cython',
+    'cython',
+
+    # Jupyter 生态（不需要打入运行时）
     'jupyter',
     'jupyter_client',
     'jupyter_core',
@@ -163,10 +178,10 @@ excludes = [
     'notebook',
     'nbformat',
     'nbconvert',
-    'Cython',
-    'cython',
-    'wheel',
+
+    # Python 打包工具（frozen 应用不需要）
     'pip',
+    'wheel',
     'sphinx',
     'docutils',
     'pygments',
