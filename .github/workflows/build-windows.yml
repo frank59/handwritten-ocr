@@ -27,7 +27,8 @@ jobs:
 
       - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip setuptools packaging
+          python -m pip install --upgrade pip
+          pip install setuptools==59.8.0 packaging
           pip install paddlepaddle==3.0.0
           pip install paddleocr==2.10.0
           pip install opencv-python-headless==4.10.0.84
@@ -66,17 +67,6 @@ jobs:
           xcopy "%pythonLocation%\Lib\site-packages\paddle\libs\*.dll" "dist\handwritten-ocr\_internal\paddle\libs\" /Y /I
           echo === paddle libs copied ===
           dir dist\handwritten-ocr\_internal\paddle\libs
-
-      - name: Copy setuptools (excluded from analysis, needed at runtime by paddle)
-        run: |
-          xcopy "%pythonLocation%\Lib\site-packages\setuptools" "dist\handwritten-ocr\_internal\setuptools\" /Y /I /E /Q
-          if exist "%pythonLocation%\Lib\site-packages\pkg_resources" (
-            xcopy "%pythonLocation%\Lib\site-packages\pkg_resources" "dist\handwritten-ocr\_internal\pkg_resources\" /Y /I /E /Q
-          ) else (
-            echo pkg_resources is bundled inside setuptools, skipping separate copy
-          )
-          echo === setuptools copied ===
-          dir dist\handwritten-ocr\_internal\setuptools\__init__.py
 
       - name: Create distribution archive
         run: |

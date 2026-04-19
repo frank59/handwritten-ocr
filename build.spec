@@ -192,7 +192,11 @@ hiddenimports = [
     'PySide6.QtGui',
     'PySide6.QtWidgets',
     'PySide6.support',
-    
+
+    # setuptools 59.8.0 — 正常分析，不 vendoring distutils
+    'setuptools',
+    'pkg_resources',
+
     # 标准库（distutils/packaging 由 PyInstaller 正常分析）
     'distutils',
     'distutils.core',
@@ -201,7 +205,7 @@ hiddenimports = [
     'packaging.version',
     'packaging.specifiers',
     'packaging.requirements',
-    
+
     # 标准库
     'logging',
     'logging.config',
@@ -376,8 +380,6 @@ excludes = [
     'nbconvert',
     'Cython',
     'cython',
-    'setuptools',  # 构建时排除（避免分析递归），构建后复制到产物目录
-    'pkg_resources',  # setuptools 子包，同上
     'wheel',
     'pip',
     'sphinx',
