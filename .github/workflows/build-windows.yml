@@ -46,7 +46,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: windows-exe
+          name: handwritten-ocr-windows.zip
           path: dist/handwritten-ocr-windows.zip
           retention-days: 30
       
