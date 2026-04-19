@@ -31,17 +31,35 @@ jobs:
       
       - name: Build with PyInstaller
         run: |
-          pyinstaller build.spec --clean --noconfirm
+          pyinstaller build.spec --clean --noconfirm 2>&1
+      
+      - name: List dist directory (debug)
+        run: |
+          echo "=== dist directory contents ==="
+          dir dist
+          echo "=== handwritten-ocr directory contents ==="
+          dir dist\handwritten-ocr
+          echo "=== Check if exe exists ==="
+          if exist dist\handwritten-ocr\handwritten-ocr.exe (
+            echo "EXE found!"
+          ) else (
+            echo "EXE NOT FOUND!"
+            exit 1
+          )
       
       - name: Copy paddle libs
         run: |
           mkdir dist\handwritten-ocr\_internal\paddle\libs
           xcopy ${{ env.pythonLocation }}\Lib\site-packages\paddle\libs\*.dll dist\handwritten-ocr\_internal\paddle\libs\ /Y /I
+          echo "=== paddle libs copied ==="
+          dir dist\handwritten-ocr\_internal\paddle\libs
       
       - name: Create distribution archive
         run: |
           cd dist
-          7z a -tzip handwritten-ocr-windows.zip handwritten-ocr\
+          7z a -tzip handwritten-ocr-windows.zip handwritten-ocr
+          echo "=== archive created ==="
+          dir handwritten-ocr-windows.zip
       
       - name: Upload artifact
         uses: actions/upload-artifact@v4
