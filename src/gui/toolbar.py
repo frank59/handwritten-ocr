@@ -3,7 +3,7 @@
 from enum import Enum, auto
 
 from PySide6.QtWidgets import QToolBar
-from PySide6.QtGui import QAction
+from PySide6.QtGui import QAction, QKeySequence
 
 
 class AppState(Enum):
@@ -22,8 +22,10 @@ class ToolBar(QToolBar):
 
         # Open Image
         self.action_open = QAction("打开图片", self)
-        self.action_open.setShortcut("Ctrl+O")
-        self.action_open.setToolTip("打开图片文件 (Ctrl+O)")
+        self.action_open.setShortcut(QKeySequence.Open)
+        self.action_open.setToolTip(
+            f"打开图片文件 ({QKeySequence(QKeySequence.Open).toString(QKeySequence.NativeText)})"
+        )
         self.addAction(self.action_open)
 
         self.addSeparator()
@@ -57,7 +59,7 @@ class ToolBar(QToolBar):
         self.addAction(self.action_generate_guides)
 
         # Add guide line
-        self.action_add_guide = QAction("添加辅助线", self)
+        self.action_add_guide = QAction("添加列辅助", self)
         self.action_add_guide.setToolTip("在图片中心添加一条列辅助线")
         self.action_add_guide.setEnabled(False)
         self.addAction(self.action_add_guide)
@@ -74,8 +76,10 @@ class ToolBar(QToolBar):
 
         # Export Excel
         self.action_export = QAction("导出 Excel", self)
-        self.action_export.setShortcut("Ctrl+S")
-        self.action_export.setToolTip("将表格导出为 Excel 文件 (Ctrl+S)")
+        self.action_export.setShortcut(QKeySequence.Save)
+        self.action_export.setToolTip(
+            f"将表格导出为 Excel 文件 ({QKeySequence(QKeySequence.Save).toString(QKeySequence.NativeText)})"
+        )
         self.action_export.setEnabled(False)
         self.addAction(self.action_export)
 

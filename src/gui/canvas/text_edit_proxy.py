@@ -15,3 +15,4 @@ class TextBoxSignals(QObject):
     box_deleted = Signal(str)            # (box_id,)
     box_created = Signal(str, tuple)     # (box_id, (x, y, w, h))
     guide_deleted = Signal(str)          # (guide_id,)
+    guide_selected = Signal(str, bool)   # (guide_id, is_selected)

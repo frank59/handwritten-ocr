@@ -11,7 +11,7 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt, QRectF, QPointF, QTimer
 from PySide6.QtGui import (
-    QColor, QPen, QBrush, QPainter, QFont, QCursor,
+    QColor, QPen, QBrush, QPainter, QFont, QCursor, QPainterPath,
 )
 
 from config import LOW_CONFIDENCE_THRESHOLD
@@ -23,6 +23,7 @@ FILL_HOVER = QColor(70, 130, 180, 90)
 FILL_EDITED = QColor(100, 200, 100, 70)
 BORDER_NORMAL = QColor(50, 100, 150, 180)
 BORDER_SELECTED = QColor(255, 140, 0, 220)
+BORDER_HIGHLIGHTED = QColor(220, 50, 50, 200)
 TEXT_COLOR = QColor(0, 0, 0, 220)
 HANDLE_COLOR = QColor(255, 140, 0, 200)
 
@@ -39,6 +40,7 @@ class ResizeHandle(QGraphicsRectItem):
         self.setFlag(QGraphicsItem.ItemIsMovable, False)
         self.setCursor(QCursor(cursor_shape))
         self.setAcceptHoverEvents(True)
+        self.setAcceptedMouseButtons(Qt.NoButton)  # Let clicks pass through to parent
         self.setVisible(False)
         self.setZValue(10)
 
@@ -68,6 +70,7 @@ class TextBoxItem(QGraphicsRectItem):
         self._is_hovering = False
         self._is_resizing = False
         self._is_edited = False
+        self._is_highlighted = False
         self._resize_handle = None
         self._resize_start_rect = None
         self._resize_start_pos = None
@@ -109,6 +112,24 @@ class TextBoxItem(QGraphicsRectItem):
         for h in self._handles:
             h.setVisible(visible)
 
+    def boundingRect(self):
+        """Expand bounding rect when selected to include resize handles outside edges."""
+        r = self.rect()
+        if self.isSelected():
+            margin = HANDLE_SIZE / 2 + 4  # handle radius + hit padding
+            return r.adjusted(-margin, -margin, margin, margin)
+        return r
+
+    def shape(self):
+        """Expand hit-test area when selected to cover resize handle regions."""
+        path = QPainterPath()
+        if self.isSelected():
+            margin = HANDLE_SIZE / 2 + 4
+            path.addRect(self.rect().adjusted(-margin, -margin, margin, margin))
+        else:
+            path.addRect(self.rect())
+        return path
+
     # --- Painting ---
 
     def paint(self, painter: QPainter, option, widget=None):
@@ -129,6 +150,8 @@ class TextBoxItem(QGraphicsRectItem):
         # Border
         if self.isSelected():
             pen = QPen(BORDER_SELECTED, 2)
+        elif self._is_highlighted:
+            pen = QPen(BORDER_HIGHLIGHTED, 2)
         else:
             pen = QPen(BORDER_NORMAL, 1.5)
         painter.setPen(pen)
@@ -169,7 +192,7 @@ class TextBoxItem(QGraphicsRectItem):
     def _notify_moved(self):
         """Emit box_resized after drag (position change = effective rect change)."""
         if not self._is_resizing:
-            QTimer.singleShot(300, self._emit_resize_signal)
+            self._emit_resize_signal()
 
     def _emit_resize_signal(self):
         new_rect = self._get_image_rect()
@@ -191,6 +214,7 @@ class TextBoxItem(QGraphicsRectItem):
                 self._resize_handle = handle_idx
                 self._resize_start_rect = QRectF(self.rect())
                 self._resize_start_pos = event.scenePos()
+                self._resize_start_item_pos = QPointF(self.pos())
                 event.accept()
                 return
         super().mousePressEvent(event)
@@ -244,9 +268,10 @@ class TextBoxItem(QGraphicsRectItem):
         if r.height() < 10:
             r.setHeight(10)
 
-        # Update position and rect
+        # Update position and rect (use saved start pos to avoid cumulative drift)
         self.prepareGeometryChange()
-        self.setPos(self.pos().x() + r.x(), self.pos().y() + r.y())
+        self.setPos(self._resize_start_item_pos.x() + r.x(),
+                    self._resize_start_item_pos.y() + r.y())
         self.setRect(0, 0, r.width(), r.height())
         self._update_handle_positions()
 
@@ -357,3 +382,8 @@ class TextBoxItem(QGraphicsRectItem):
     def set_confidence(self, conf):
         self._confidence = conf
         self.update()
+
+    def set_highlighted(self, highlighted: bool):
+        if self._is_highlighted != highlighted:
+            self._is_highlighted = highlighted
+            self.update()

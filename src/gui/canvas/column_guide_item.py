@@ -12,10 +12,12 @@ from PySide6.QtWidgets import (
     QGraphicsLineItem, QGraphicsEllipseItem, QGraphicsItem, QMenu,
 )
 from PySide6.QtCore import Qt, QPointF
-from PySide6.QtGui import QColor, QPen, QBrush, QCursor
+from PySide6.QtGui import QColor, QPen, QBrush, QCursor, QPainterPath, QPainterPathStroker
 
 GUIDE_COLOR = QColor(0, 180, 80, 160)
 HANDLE_COLOR = QColor(0, 200, 100, 200)
+GUIDE_COLOR_SELECTED = QColor(220, 50, 50, 200)
+HANDLE_COLOR_SELECTED = QColor(240, 80, 80, 220)
 HANDLE_RADIUS = 6
 
 
@@ -50,6 +52,10 @@ class GuideEndpointHandle(QGraphicsEllipseItem):
             self._parent_guide.update_line()
         return super().itemChange(change, value)
 
+    def mouseReleaseEvent(self, event):
+        super().mouseReleaseEvent(event)
+        self._parent_guide.notify_drag_finished()
+
 
 class ColumnGuideItem(QGraphicsLineItem):
     """A column guide line with two draggable endpoints."""
@@ -73,6 +79,7 @@ class ColumnGuideItem(QGraphicsLineItem):
         pen = QPen(GUIDE_COLOR, 2, Qt.DashLine)
         self.setPen(pen)
         self.setZValue(2)
+        self.setFlag(QGraphicsItem.ItemIsSelectable, True)
 
         # Create endpoint handles (relative to this item's coordinate system)
         self._top_handle = GuideEndpointHandle(x_position, 0, self, max_x, max_y)
@@ -80,11 +87,48 @@ class ColumnGuideItem(QGraphicsLineItem):
 
         self.update_line()
 
+    def boundingRect(self):
+        """Expand bounding rect to match the wider shape() hit area."""
+        return self.shape().boundingRect()
+
+    def shape(self):
+        """Widen hit-test area to ~12px for easier clicking."""
+        path = QPainterPath()
+        line = self.line()
+        path.moveTo(line.p1())
+        path.lineTo(line.p2())
+        stroker = QPainterPathStroker()
+        stroker.setWidth(12)
+        return stroker.createStroke(path)
+
+    def itemChange(self, change, value):
+        if change == QGraphicsItem.ItemSelectedHasChanged:
+            selected = bool(value)
+            self._apply_visual_state(selected)
+            self._signals.guide_selected.emit(self.guide_id, selected)
+        return super().itemChange(change, value)
+
+    def _apply_visual_state(self, selected):
+        """Switch line and handle colors between normal (green) and selected (red)."""
+        if selected:
+            self.setPen(QPen(GUIDE_COLOR_SELECTED, 2, Qt.SolidLine))
+            self._top_handle.setBrush(QBrush(HANDLE_COLOR_SELECTED))
+            self._bottom_handle.setBrush(QBrush(HANDLE_COLOR_SELECTED))
+        else:
+            self.setPen(QPen(GUIDE_COLOR, 2, Qt.DashLine))
+            self._top_handle.setBrush(QBrush(HANDLE_COLOR))
+            self._bottom_handle.setBrush(QBrush(HANDLE_COLOR))
+
     def update_line(self):
         """Recompute line geometry from endpoint positions."""
         p1 = self._top_handle.pos()
         p2 = self._bottom_handle.pos()
         self.setLine(p1.x(), p1.y(), p2.x(), p2.y())
+
+    def notify_drag_finished(self):
+        """Called by endpoint handle after drag completes."""
+        if self.isSelected():
+            self._signals.guide_selected.emit(self.guide_id, True)
 
     def get_line_points(self):
         """Return endpoint positions as ((x1,y1), (x2,y2))."""
@@ -122,8 +166,16 @@ class ColumnGuideItem(QGraphicsLineItem):
         return numerator / denominator
 
     def contextMenuEvent(self, event):
+        if not self.isSelected():
+            if self.scene():
+                self.scene().clearSelection()
+            self.setSelected(True)
         menu = QMenu()
-        delete_action = menu.addAction("删除此辅助线")
+        delete_action = menu.addAction("删除辅助线")
         action = menu.exec(event.screenPos())
         if action == delete_action:
-            self._signals.guide_deleted.emit(self.guide_id)
+            self._delete_self()
+
+    def _delete_self(self):
+        """Emit deletion signal (ImageCanvas handles scene removal)."""
+        self._signals.guide_deleted.emit(self.guide_id)

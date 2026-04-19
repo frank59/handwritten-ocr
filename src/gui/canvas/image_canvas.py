@@ -12,6 +12,7 @@ import numpy as np
 
 from PySide6.QtWidgets import (
     QGraphicsView, QGraphicsScene, QGraphicsPixmapItem, QGraphicsRectItem,
+    QGraphicsProxyWidget,
 )
 from PySide6.QtCore import Qt, QRectF
 from PySide6.QtGui import QPixmap, QImage, QPainter, QColor, QPen, QBrush
@@ -44,6 +45,7 @@ class ImageCanvas(QGraphicsView):
         self._guide_lines = []     # list of ColumnGuideItem
 
         self.signals = TextBoxSignals()
+        self.signals.guide_selected.connect(self._on_guide_selected)
 
         # Shift-hide state
         self._boxes_hidden = False
@@ -166,7 +168,11 @@ class ImageCanvas(QGraphicsView):
     # --- Guide line management ---
 
     def generate_guide_lines(self):
-        """Estimate column positions and create guide lines."""
+        """Generate vertical guide lines from the topmost row of text boxes.
+
+        For each box in the topmost row, creates a vertical guide line
+        at the box's X-center, spanning from y=0 to the image bottom edge.
+        """
         from src.gui.canvas.column_guide_item import ColumnGuideItem
 
         self.clear_guide_lines()
@@ -174,14 +180,17 @@ class ImageCanvas(QGraphicsView):
         if not boxes:
             return
 
-        # Estimate first row: boxes with Y-center close to the top-most
+        img_h = self._image_np.shape[0] if self._image_np is not None else 1000
+        img_w = self._image_np.shape[1] if self._image_np is not None else 1000
+
+        # Find the topmost row by Y-center proximity
+        sorted_by_y = sorted(boxes, key=lambda b: b.rect[1] + b.rect[3] / 2)
+        top_y = sorted_by_y[0].rect[1] + sorted_by_y[0].rect[3] / 2
+
         heights = [b.rect[3] for b in boxes]
         heights.sort()
         median_h = heights[len(heights) // 2]
         threshold = max(median_h * 0.5, 5)
-
-        sorted_by_y = sorted(boxes, key=lambda b: b.rect[1] + b.rect[3] / 2)
-        top_y = sorted_by_y[0].rect[1] + sorted_by_y[0].rect[3] / 2
 
         first_row = []
         for b in sorted_by_y:
@@ -191,11 +200,8 @@ class ImageCanvas(QGraphicsView):
             else:
                 break
 
-        # Sort first row by X to get column positions
+        # Sort left-to-right, create a vertical guide per box
         first_row.sort(key=lambda b: b.rect[0] + b.rect[2] / 2)
-
-        img_h = self._image_np.shape[0] if self._image_np is not None else 1000
-        img_w = self._image_np.shape[1] if self._image_np is not None else 1000
 
         for box in first_row:
             x_center = box.rect[0] + box.rect[2] / 2
@@ -266,6 +272,15 @@ class ImageCanvas(QGraphicsView):
                 self.viewport().setCursor(Qt.CrossCursor)
             event.accept()
             return
+        if event.key() in (Qt.Key_Delete, Qt.Key_Backspace):
+            # Guard: don't intercept DEL/Backspace when editing text inline
+            focus = self._scene.focusItem()
+            if focus and isinstance(focus, QGraphicsProxyWidget):
+                super().keyPressEvent(event)
+                return
+            self._delete_selected_items()
+            event.accept()
+            return
         super().keyPressEvent(event)
 
     def keyReleaseEvent(self, event):
@@ -286,6 +301,45 @@ class ImageCanvas(QGraphicsView):
             item.setVisible(visible)
         for guide in self._guide_lines:
             guide.setVisible(visible)
+
+    def _delete_selected_items(self):
+        """Delete all currently selected text boxes and guide lines."""
+        from src.gui.canvas.column_guide_item import ColumnGuideItem
+
+        selected = list(self._scene.selectedItems())
+        for item in selected:
+            if isinstance(item, TextBoxItem):
+                item._delete_self()
+            elif isinstance(item, ColumnGuideItem):
+                item._delete_self()
+
+    def _on_guide_selected(self, guide_id: str, is_selected: bool):
+        """Highlight text boxes that intersect the selected guide line."""
+        from src.parsing.table_generator import TableGenerator
+
+        if not is_selected:
+            # Clear all highlights
+            for item in self._text_box_items.values():
+                item.set_highlighted(False)
+            return
+
+        # Find the guide line
+        guide = None
+        for g in self._guide_lines:
+            if g.guide_id == guide_id:
+                guide = g
+                break
+        if guide is None:
+            return
+
+        (x1, y1), (x2, y2) = guide.get_line_points()
+        for item in self._text_box_items.values():
+            pos = item.pos()
+            r = item.rect()
+            rx, ry = int(pos.x()), int(pos.y())
+            rw, rh = int(r.width()), int(r.height())
+            hit = TableGenerator._line_intersects_rect(x1, y1, x2, y2, rx, ry, rw, rh)
+            item.set_highlighted(hit)
 
     # --- Ctrl+drag: create new box ---
 

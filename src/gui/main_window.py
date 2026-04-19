@@ -7,8 +7,8 @@ from PySide6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QStackedWidget, QLabel, QPushButton, QFileDialog, QMessageBox,
 )
-from PySide6.QtCore import Qt
-from PySide6.QtGui import QAction
+from PySide6.QtCore import Qt, QTimer
+from PySide6.QtGui import QAction, QKeySequence
 
 from config import WINDOW_WIDTH, WINDOW_HEIGHT, APP_NAME
 from src.preprocessing.loader import load_image, ImageLoadError
@@ -39,6 +39,12 @@ class MainWindow(QMainWindow):
         self._current_doc = None        # ParsedDocument
         self._worker = None
         self._crop_worker = None
+        self._pending_resize_box_id = None
+        self._pending_resize_rect = None
+        self._resize_debounce_timer = QTimer(self)
+        self._resize_debounce_timer.setSingleShot(True)
+        self._resize_debounce_timer.setInterval(1000)
+        self._resize_debounce_timer.timeout.connect(self._on_resize_debounce_timeout)
 
         self._setup_ui()
         self._connect_signals()
@@ -88,18 +94,18 @@ class MainWindow(QMainWindow):
 
         file_menu = menubar.addMenu("文件")
         open_action = QAction("打开图片", self)
-        open_action.setShortcut("Ctrl+O")
+        open_action.setShortcut(QKeySequence.Open)
         open_action.triggered.connect(self.on_open_image)
         file_menu.addAction(open_action)
 
         export_action = QAction("导出 Excel", self)
-        export_action.setShortcut("Ctrl+S")
+        export_action.setShortcut(QKeySequence.Save)
         export_action.triggered.connect(self.on_export_excel)
         file_menu.addAction(export_action)
 
         file_menu.addSeparator()
         quit_action = QAction("退出", self)
-        quit_action.setShortcut("Ctrl+Q")
+        quit_action.setShortcut(QKeySequence.Quit)
         quit_action.triggered.connect(self.close)
         file_menu.addAction(quit_action)
 
@@ -240,18 +246,35 @@ class MainWindow(QMainWindow):
                     break
 
     def _on_box_resized(self, box_id: str, new_rect: tuple):
-        """Re-run OCR on the resized box region."""
+        """Debounce: schedule OCR re-recognition 1s after last resize event."""
         if self._current_image is None or self._ocr_result is None:
             return
 
-        # Update box rect in OCR result
-        target_box = None
+        # Update box rect in OCR result immediately
         for box in self._ocr_result.boxes:
             if box.box_id == box_id:
                 box.rect = new_rect
-                target_box = box
                 break
 
+        # Store pending info and restart the 1-second timer
+        self._pending_resize_box_id = box_id
+        self._pending_resize_rect = new_rect
+        self._resize_debounce_timer.start()
+
+    def _on_resize_debounce_timeout(self):
+        """Timer fired: 1s since last resize — run OCR on the pending box."""
+        box_id = self._pending_resize_box_id
+        self._pending_resize_box_id = None
+        self._pending_resize_rect = None
+
+        if box_id is None or self._current_image is None or self._ocr_result is None:
+            return
+
+        target_box = None
+        for box in self._ocr_result.boxes:
+            if box.box_id == box_id:
+                target_box = box
+                break
         if not target_box:
             return
 
