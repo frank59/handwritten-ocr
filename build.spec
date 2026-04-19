@@ -29,15 +29,22 @@ for pkg in ['paddleocr', 'paddle', 'shapely', 'pyclipper', 'psutil',
 # collect_all: 递归收集所有子模块，包括动态 import 的模块。
 # 注意：setuptools 不使用 collect_all，避免触发 vendored 依赖的 hooks 递归。
 # setuptools 59.8.0 使用 collect_submodules + 手动指定子模块代替。
-_collect_all = []
+#
+# collect_all() 返回 (datas, binaries, hiddenimports) 三元组，必须分别解包。
+_collect_all_datas = []
+_collect_all_binaries = []
+_collect_all_hiddenimports = []
 for pkg in ['paddle', 'paddleocr', 'shapely', 'scipy', 'pyclipper',
             'lmdb', 'pyyaml', 'tqdm', 'attrs', 'six', 'psutil',
             'openpyxl', 'cv2', 'PIL']:
     try:
-        _collected = collect_all(pkg)
-        if _collected:
-            _collect_all += _collected
-            print(f'collect_all({pkg}): {len(_collected)} submodules')
+        result = collect_all(pkg)
+        if result:
+            cd, cb, chi = result
+            _collect_all_datas.extend(cd or [])
+            _collect_all_binaries.extend(cb or [])
+            _collect_all_hiddenimports.extend(chi or [])
+            print(f'collect_all({pkg}): {len(chi or [])} hidden imports')
     except Exception as e:
         print(f'collect_all({pkg}) failed: {e}')
 
@@ -52,8 +59,12 @@ for pkg in ['numpy', 'pandas', 'setuptools', 'pkg_resources']:
     except Exception as e:
         print(f'collect_submodules({pkg}) failed: {e}')
 
-# hiddenimports: collect_all + collect_submodules + 必须显式指定的模块
-hiddenimports = _collect_all + _collect_sub + [
+# datas / binaries / hiddenimports 组装
+datas += _collect_all_datas
+_binaries = _collect_all_binaries
+
+# hiddenimports: collect_all 返回的 hiddenimports + collect_submodules + 必须显式指定的模块
+hiddenimports = _collect_all_hiddenimports + _collect_sub + [
     # PySide6 — Qt 绑定
     'PySide6',
     'PySide6.QtCore',
@@ -165,7 +176,7 @@ excludes = [
 a = Analysis(
     ['main.py'],
     pathex=[],
-    binaries=[],
+    binaries=_binaries,
     datas=datas,
     hiddenimports=hiddenimports,
     hookspath=['hooks'],
