@@ -143,7 +143,6 @@ excludes = [
     'scrapy',
     'bs4',
     'beautifulsoup4',
-    'httpx',
     'aiohttp',
     'pytest',
     '_pytest',
