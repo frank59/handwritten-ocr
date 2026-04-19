@@ -1,193 +1,288 @@
-# Windows 打包指南
+# Windows EXE 打包指南
 
-本文档说明如何将手写表格识别工具打包为 Windows 可执行文件 (.exe)。
+本文档说明如何将手写表格识别工具打包为独立的 Windows exe 文件。
 
-## 环境准备
+> ⚠️ **重要**: PyInstaller 不支持跨平台打包。在 macOS 上无法直接生成 Windows exe。
 
-### 硬件要求
-- Windows 10/11 (64位)
-- 建议 16GB+ RAM（OCR 推理需要较多内存）
-- 至少 10GB 可用磁盘空间
+---
 
-### 软件要求
-- Python 3.10 或 3.11（推荐，3.12 可能存在兼容性问题）
-- Git for Windows
-- 8GB+ RAM
+## 跨平台打包方案（macOS → Windows）
 
-## 打包步骤
+如果你在 macOS 上开发，有以下几种方式生成 Windows exe：
 
-### 1. 克隆项目
+### 方案 1: GitHub Actions（推荐，免费）
+
+已配置好自动化构建流程，推送到 GitHub 后自动打包。
+
+**使用方法**：
+
+1. 将代码推送到 GitHub 仓库
+2. 手动触发构建：进入 Actions → Build Windows EXE → Run workflow
+3. 或发布版本：创建 tag（如 `v1.0.0`）自动触发
+4. 构建完成后下载 artifact `windows-exe`
+
+**配置文件**: `.github/workflows/build-windows.yml`
+
+### 方案 2: 虚拟机
+
+在 macOS 上安装 Windows 虚拟机：
+
+| 虚拟机软件 | 类型 | 说明 |
+|-----------|------|------|
+| Parallels Desktop | 商业 | 性能最好，约 ¥600/年 |
+| VMware Fusion | 商业 | 稳定可靠 |
+| VirtualBox | 免费 | 性能较差 |
+| UTM | 免费 | Apple Silicon 推荐 |
+
+### 方案 3: 远程 Windows
+
+使用远程 Windows 电脑或云服务器：
+
+- AWS EC2 Windows 实例
+- Azure Windows VM
+- 自己的 Windows 电脑（远程桌面）
+
+---
+
+## 在 Windows 上直接打包
+
+### 1. 准备 Windows 环境
 
 ```powershell
-git clone <your-repo-url>
-cd handwritten-ocr
-```
-
-### 2. 创建虚拟环境
-
-```powershell
-# 使用 Python 3.10 创建虚拟环境
+# 使用 Python 3.10 (推荐，兼容性最好)
 py -3.10 -m venv venv
 .\venv\Scripts\activate
 ```
 
-### 3. 安装依赖
+### 2. 安装依赖
 
 ```powershell
-# 安装 CPU 版本的 PaddlePaddle（节省空间，无 CUDA 依赖）
+# 安装 CPU 版本的 PaddlePaddle
 pip install paddlepaddle==3.0.0
 
 # 安装其他依赖
 pip install paddleocr==2.10.0
 pip install opencv-python-headless==4.10.0.84
 pip install PySide6==6.8.3
-pip install pandas>=2.0
-pip install openpyxl>=3.1
-pip install "numpy>=1.24,<2.0"
+pip install pandas openpyxl "numpy>=1.24,<2.0"
 
 # 安装打包工具
 pip install pyinstaller
 ```
 
-### 4. 验证运行环境
+### 3. 验证程序运行
 
 ```powershell
 python main.py
 ```
 
-确保程序能正常运行后再进行打包。
+确保程序能正常启动并完成 OCR 识别后再打包。
 
-### 5. 执行打包
+### 4. 执行打包
 
 ```powershell
-pyinstaller build.spec --clean
+pyinstaller build.spec --clean --noconfirm
 ```
 
-打包过程可能需要 10-20 分钟，取决于网络和硬件。
+打包过程约 10-30 分钟。
 
-### 6. 查找输出文件
+### 5. 复制 Paddle libs（关键步骤）
 
-打包完成后，可执行文件位于：
+PaddlePaddle 的 DLL 文件可能未被正确收集，需要手动复制：
+
+```powershell
+# 创建目标目录
+mkdir dist\handwritten-ocr\_internal\paddle\libs
+
+# 复制所有 DLL 文件
+xcopy venv\Lib\site-packages\paddle\libs\*.dll dist\handwritten-ocr\_internal\paddle\libs\ /Y /I
 ```
-dist\handwritten-ocr\handwritten-ocr.exe
+
+### 6. 测试打包结果
+
+```powershell
+cd dist\handwritten-ocr
+.\handwritten-ocr.exe
 ```
 
-整个 `dist\handwritten-ocr` 文件夹可以分发给用户。
+首次运行会自动下载 OCR 模型到用户目录 `C:\Users\<用户名>\.paddleocr\`。
 
-## 常见问题
+---
 
-### Q1: 打包后运行报错 "ModuleNotFoundError"
+## 常见问题排查
 
-某些动态导入的模块未被收集。编辑 `build.spec`，在 `hiddenimports` 中添加缺失的模块：
+### 问题 1: ModuleNotFoundError
+
+```
+ModuleNotFoundError: No module named 'xxx'
+```
+
+**解决方案**: 在 `build.spec` 的 `hiddenimports` 中添加缺失模块：
 
 ```python
 hiddenimports = [
     # ... 现有模块
-    'missing_module_name',  # 添加这里
+    'xxx',  # 添加缺失模块
 ]
 ```
 
-### Q2: 程序启动很慢
+### 问题 2: TypeError: sequence item 0: expected str instance, NoneType found
 
-这是正常现象，首次运行需要初始化 PaddleOCR 模型缓存。后续运行会使用缓存，速度正常。
+这是 `paddle/fluid/core.py` 中 `site.USER_SITE` 为 None 的问题。
 
-### Q3: 打包体积太大 (>2GB)
+**解决方案**: 已在 `main.py` 和 `hooks/runtime_hook_paddle.py` 中修复。如果仍有问题，检查：
 
-PaddleOCR 模型文件较大。可接受的分发方式：
-- 提供下载链接，首次运行时自动下载模型
-- 或者接受大体积（模型本身约 200MB）
+```powershell
+# 确保 runtime hook 被正确打包
+dir dist\handwritten-ocr\_internal\hooks
+```
 
-### Q4: 杀毒软件报毒
+### 问题 3: 找不到 paddle libs
 
-PyInstaller 打包的程序有时会被误报。解决方案：
-- 使用代码签名证书签名
-- 向杀毒软件厂商提交误报
-- 使用 Nuitka 替代 PyInstaller（编译为 C）
+```
+OSError: cannot load library 'paddle\libs\xxx.dll'
+```
 
-### Q5: 图标不显示
+**解决方案**: 手动复制 DLL 文件：
 
-将 256x256 的 .ico 文件放到项目根目录，编辑 `build.spec`：
+```powershell
+xcopy venv\Lib\site-packages\paddle\libs\*.dll dist\handwritten-ocr\_internal\paddle\libs\ /Y /I
+```
+
+### 问题 4: 程序启动后闪退
+
+**解决方案**: 使用 `console=True` 模式查看错误信息：
+
+1. 编辑 `build.spec`，设置 `console=True`
+2. 重新打包：`pyinstaller build.spec --clean`
+3. 从命令行运行：`.\handwritten-ocr.exe`
+4. 查看控制台输出的错误信息
+
+### 问题 5: 打包体积过大
+
+正常情况下打包目录约 1-2GB。如果更大：
+
+1. 检查 `build.spec` 的 `excludes` 是否生效
+2. 使用 UPX 压缩（已默认启用）
+3. 手动删除不需要的文件：
+
+```powershell
+# 删除测试相关文件
+rmdir /s /q dist\handwritten-ocr\_internal\tests
+rmdir /s /q dist\handwritten-ocr\_internal\pytest
+```
+
+---
+
+## 调试技巧
+
+### 查看导入的所有模块
+
+```powershell
+# 在 Python 中运行，查看 paddleocr 的所有子模块
+python -c "from PyInstaller.utils.hooks import collect_submodules; print(collect_submodules('paddleocr'))"
+```
+
+### 验证 DLL 文件
+
+```powershell
+# 查看 paddle libs 目录
+dir venv\Lib\site-packages\paddle\libs
+
+# 复制后验证
+dir dist\handwritten-ocr\_internal\paddle\libs
+```
+
+### 添加调试信息
+
+临时修改 `main.py`，在启动时打印路径信息：
+
+```python
+import sys
+print(f"Python path: {sys.path}")
+print(f"Executable: {sys.executable}")
+print(f"frozen: {getattr(sys, 'frozen', False)}")
+```
+
+---
+
+## 发布准备
+
+### 隐藏控制台窗口
+
+调试成功后，修改 `build.spec`：
 
 ```python
 exe = EXE(
     # ...
-    icon='app.ico',  # 替换为你的图标文件
+    console=False,  # 改为 False
 )
 ```
 
-## 高级配置
+重新打包。
 
-### 使用单文件模式
+### 添加图标
 
-修改 `build.spec` 中的 `exe` 部分：
-
-```python
-exe = EXE(
-    pyz,
-    a.scripts,
-    a.binaries,
-    a.zipfiles,
-    a.datas,
-    [],
-    name='handwritten-ocr',
-    console=False,
-    onefile=True,  # 添加此行，生成单个 exe 文件
-)
-```
-
-单文件模式启动较慢，不推荐用于大程序。
-
-### 分离数据和程序
-
-默认情况下，数据文件会放在程序同目录下。如需分离：
+准备 `assets/app.ico` 文件（256x256），修改 `build.spec`：
 
 ```python
 exe = EXE(
     # ...
-    strip=False,
-    upx=False,
-    runtime_tmpdir='.',  # 运行时临时文件位置
+    icon='assets/app.ico',
 )
 ```
 
-## 测试打包结果
+### 创建分发包
 
-在没有安装 Python 的 Windows 电脑上测试：
+```powershell
+# 压缩为 zip
+Compress-Archive -Path dist\handwritten-ocr -DestinationPath handwritten-ocr-windows.zip
 
-1. 复制整个 `dist\handwritten-ocr` 文件夹
+# 或使用 7-Zip (压缩率更高)
+7z a -t7z handwritten-ocr-windows.7z dist\handwritten-ocr\
+
+# 最终文件大小约 500-800MB (压缩后)
+```
+
+---
+
+## 用户使用说明
+
+分发给用户时，附带以下说明：
+
+1. 解压 `handwritten-ocr-windows.zip`
 2. 运行 `handwritten-ocr.exe`
-3. 检查日志输出是否有错误
+3. 首次启动需要联网下载模型（约 50MB）
+4. 之后可完全离线使用
 
-## 进一步优化
+---
 
-### 使用 Nuitka 编译
+## 文件结构
 
-Nuitka 可以将 Python 编译为 C，性能更好：
+打包后的目录结构：
 
-```powershell
-pip install nuitka
-
-# 编译（需要 Visual Studio Build Tools）
-python -m nuitka --standalone --onefile --enable-plugin=pyside6 main.py
+```
+handwritten-ocr/
+├── handwritten-ocr.exe      # 主程序
+├── _internal/               # 内部依赖
+│   ├── python310.dll        # Python 运行时
+│   ├── paddle/              # PaddlePaddle
+│   │   └── libs/            # DLL 文件
+│   ├── paddleocr/           # PaddleOCR
+│   ├── PySide6/             # Qt 库
+│   ├── numpy/               # 数值计算
+│   ├── pandas/              # 数据处理
+│   ├── cv2/                 # OpenCV
+│   ├── src/                 # 项目源码
+│   └── config.py            # 配置文件
 ```
 
-### 使用 conda 环境
+---
 
-使用 conda 可以更好地管理 PaddlePaddle 的二进制依赖：
+## 注意事项
 
-```powershell
-conda create -n ocr-env python=3.10
-conda activate ocr-env
-# 安装 PyTorch CPU 版本
-conda install pytorch cpuonly -c pytorch
-# 安装其他依赖
-pip install paddleocr PySide6 pandas openpyxl
-```
-
-## 获取帮助
-
-如果打包遇到问题，请提供：
-1. 完整的错误信息
-2. 你的 Windows 版本
-3. Python 版本 (`python --version`)
-4. 打包命令的完整输出
+1. **必须在 Windows 上打包** - PyInstaller 不支持跨平台打包
+2. **使用 Python 3.10** - 3.12 可能存在兼容问题
+3. **首次运行需要联网** - 下载 OCR 模型到用户目录
+4. **调试时用 console=True** - 方便查看错误信息
+5. **手动复制 paddle libs** - 这是关键步骤
