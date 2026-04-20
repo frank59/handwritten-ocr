@@ -396,6 +396,7 @@ class TextBoxItem(QGraphicsRectItem):
         self.setSelected(False)
         self._is_resizing = False
         self._resize_handle = None
+        self._is_edited = False
         self._is_editing = False
         if self._edit_proxy is not None:
             proxy = self._edit_proxy
