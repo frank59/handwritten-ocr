@@ -4,6 +4,7 @@ from PySide6.QtCore import QThread, Signal
 
 import numpy as np
 import logging
+import traceback
 
 from src.preprocessing.enhancer import enhance_image
 from src.preprocessing.loader import ImageLoadError
@@ -62,4 +63,6 @@ class OCRWorker(QThread):
             self.finished.emit(result)
 
         except Exception as e:
-            self.error.emit(f"处理出错: {e}")
+            tb = traceback.format_exc()
+            logger.error("OCR处理异常: %s\n%s", e, tb)
+            self.error.emit(f"处理出错: {e}\n\n详细信息已记录到 logs/app.log")
