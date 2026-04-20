@@ -4,6 +4,8 @@ Manages lifecycle of the PaddleOCR model instance.
 Model is loaded lazily on first use and cached.
 """
 
+import sys
+import os
 import logging
 
 from paddleocr import PaddleOCR
@@ -33,16 +35,27 @@ class OCREngine:
         """Get or initialize PP-OCRv4 instance."""
         if self._text_ocr is None:
             logger.info("Initializing PP-OCRv4 OCR engine...")
-            self._text_ocr = PaddleOCR(
-                use_angle_cls=True,
-                lang='ch',
-                use_gpu=False,
-                show_log=False,
-                det_db_thresh=OCR_DET_DB_THRESH,
-                det_db_unclip_ratio=OCR_DET_DB_UNCLIP_RATIO,
-                rec_batch_num=OCR_REC_BATCH_NUM,
-                drop_score=OCR_DROP_SCORE,
-            )
+            # PaddleOCR may download model weights on first run.
+            # tqdm writes to sys.stdout which is None in PyInstaller frozen env,
+            # causing "'NoneType' object has no attribute 'write'" crash.
+            # Redirect stdout to devnull to silence tqdm during download.
+            _orig_stdout = sys.stdout
+            _null_fd = open(os.devnull, 'w')
+            sys.stdout = _null_fd
+            try:
+                self._text_ocr = PaddleOCR(
+                    use_angle_cls=True,
+                    lang='ch',
+                    use_gpu=False,
+                    show_log=False,
+                    det_db_thresh=OCR_DET_DB_THRESH,
+                    det_db_unclip_ratio=OCR_DET_DB_UNCLIP_RATIO,
+                    rec_batch_num=OCR_REC_BATCH_NUM,
+                    drop_score=OCR_DROP_SCORE,
+                )
+            finally:
+                sys.stdout = _orig_stdout
+                _null_fd.close()
             logger.info("PP-OCRv4 engine initialized.")
         return self._text_ocr
 
