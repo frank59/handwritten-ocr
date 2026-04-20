@@ -1,7 +1,6 @@
 """Image loading and validation."""
 
 import os
-import sys
 import cv2
 import numpy as np
 import logging
@@ -14,24 +13,6 @@ logger = logging.getLogger(__name__)
 class ImageLoadError(Exception):
     """Raised when image loading fails."""
     pass
-
-
-def _to_fs_path(file_path: str) -> str:
-    """Convert path to filesystem encoding for cv2.imread compatibility.
-
-    On Windows with Chinese locale, cv2.imread may fail on paths with
-    non-ASCII characters. Use os.fsdecode to normalize the path.
-    """
-    # If already bytes, decode with filesystem encoding
-    if isinstance(file_path, bytes):
-        return file_path
-    # On Windows, try converting to filesystem encoding to help cv2.imread
-    if sys.platform == 'win32':
-        try:
-            return os.fsencode(file_path).decode('gbk')
-        except (UnicodeDecodeError, UnicodeEncodeError):
-            pass
-    return file_path
 
 
 def validate_file(file_path: str) -> None:
@@ -67,11 +48,19 @@ def load_image(file_path: str) -> np.ndarray:
     """
     validate_file(file_path)
 
-    # Convert path for cv2.imread compatibility on Windows with non-ASCII paths
-    fs_path = _to_fs_path(file_path)
+    # Use open() + cv2.imdecode() instead of cv2.imread() to support
+    # non-ASCII (e.g. Chinese) file paths on Windows.
+    # cv2.imread relies on C runtime fopen() which cannot handle Unicode paths.
+    try:
+        with open(file_path, 'rb') as f:
+            file_bytes = np.frombuffer(f.read(), np.uint8)
+        image = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
+    except OSError as e:
+        logger.error("读取图片文件失败: %s, 错误: %s", file_path, e)
+        raise ImageLoadError(f"无法读取图片文件: {file_path}\n{e}")
 
-    image = cv2.imread(fs_path, cv2.IMREAD_COLOR)
     if image is None:
-        raise ImageLoadError(f"无法读取图片文件，请确认文件完整: {file_path}")
+        raise ImageLoadError(f"无法解码图片文件，请确认文件完整: {file_path}")
 
+    logger.info("成功加载图片: %s, 尺寸: %s", file_path, image.shape)
     return image
