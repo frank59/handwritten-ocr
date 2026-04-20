@@ -449,3 +449,40 @@ class MainWindow(QMainWindow):
             "  Delete键: 删除选中区域\n\n"
             "技术栈: PaddleOCR + PySide6"
         )
+
+    def closeEvent(self, event):
+        """Clean up background workers before closing the window.
+
+        Ensures the process terminates completely when the user clicks
+        the × button, without leaving orphaned threads.
+        """
+        logger.info("[ui] 窗口关闭，开始清理后台线程...")
+
+        # Cancel and wait for OCR worker
+        if self._worker is not None and self._worker.isRunning():
+            logger.info("[ui] 取消 OCR worker...")
+            self._worker.cancel()
+            self._worker.wait(3000)  # wait up to 3 seconds
+            if self._worker.isRunning():
+                logger.warning("[ui] OCR worker 未能在 3s 内结束，强制终止")
+                self._worker.terminate()
+                self._worker.wait()
+            self._worker = None
+
+        # Cancel and wait for crop recognition worker
+        if self._crop_worker is not None and self._crop_worker.isRunning():
+            logger.info("[ui] 取消 crop worker...")
+            self._crop_worker.wait(3000)
+            if self._crop_worker.isRunning():
+                self._crop_worker.terminate()
+                self._crop_worker.wait()
+            self._crop_worker = None
+
+        # Close progress dialog if open
+        if hasattr(self, '_progress') and self._progress is not None:
+            self._progress.close()
+            self._progress = None
+
+        logger.info("[ui] 所有线程已清理，进程即将退出")
+        event.accept()
+
