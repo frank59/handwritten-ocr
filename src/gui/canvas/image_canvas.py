@@ -134,11 +134,12 @@ class ImageCanvas(QGraphicsView):
             self._scene.removeItem(item)
 
     def update_box_text(self, box_id: str, text: str, confidence: float):
-        """Update the text and confidence of a specific box."""
+        """Update the text and confidence of a specific box, and reset its editing state."""
         item = self._text_box_items.get(box_id)
         if item:
             item.set_text(text)
             item.set_confidence(confidence)
+            item.reset_editing_state()
 
     def get_all_boxes(self) -> list:
         """Collect current state of all text boxes."""

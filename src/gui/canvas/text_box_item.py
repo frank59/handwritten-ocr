@@ -387,3 +387,26 @@ class TextBoxItem(QGraphicsRectItem):
         if self._is_highlighted != highlighted:
             self._is_highlighted = highlighted
             self.update()
+
+    def reset_editing_state(self):
+        """Clear selection, resize handles, and resizing flags after re-recognition.
+
+        Called automatically by the canvas after a box resize triggers re-OCR.
+        """
+        self.setSelected(False)
+        self._is_resizing = False
+        self._resize_handle = None
+        self._is_editing = False
+        if self._edit_proxy is not None:
+            proxy = self._edit_proxy
+            self._edit_proxy = None
+            widget = proxy.widget()
+            if widget:
+                try:
+                    widget.editingFinished.disconnect(self._finish_editing)
+                except RuntimeError:
+                    pass
+                proxy.setParentItem(None)
+                proxy.deleteLater()
+        self._show_handles(False)
+        self.update()
