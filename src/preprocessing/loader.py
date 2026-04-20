@@ -1,6 +1,7 @@
 """Image loading and validation."""
 
 import os
+import sys
 import cv2
 import numpy as np
 
@@ -10,6 +11,24 @@ from config import SUPPORTED_EXTENSIONS, MAX_FILE_SIZE_MB
 class ImageLoadError(Exception):
     """Raised when image loading fails."""
     pass
+
+
+def _to_fs_path(file_path: str) -> str:
+    """Convert path to filesystem encoding for cv2.imread compatibility.
+
+    On Windows with Chinese locale, cv2.imread may fail on paths with
+    non-ASCII characters. Use os.fsdecode to normalize the path.
+    """
+    # If already bytes, decode with filesystem encoding
+    if isinstance(file_path, bytes):
+        return file_path
+    # On Windows, try converting to filesystem encoding to help cv2.imread
+    if sys.platform == 'win32':
+        try:
+            return os.fsencode(file_path).decode('gbk')
+        except (UnicodeDecodeError, UnicodeEncodeError):
+            pass
+    return file_path
 
 
 def validate_file(file_path: str) -> None:
@@ -45,7 +64,10 @@ def load_image(file_path: str) -> np.ndarray:
     """
     validate_file(file_path)
 
-    image = cv2.imread(file_path, cv2.IMREAD_COLOR)
+    # Convert path for cv2.imread compatibility on Windows with non-ASCII paths
+    fs_path = _to_fs_path(file_path)
+
+    image = cv2.imread(fs_path, cv2.IMREAD_COLOR)
     if image is None:
         raise ImageLoadError(f"无法读取图片文件，请确认文件完整: {file_path}")
 
