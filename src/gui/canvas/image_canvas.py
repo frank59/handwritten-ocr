@@ -285,7 +285,7 @@ class ImageCanvas(QGraphicsView):
         super().keyPressEvent(event)
 
     def keyReleaseEvent(self, event):
-        if event.key() == Qt.Key_Shift and not event.isAutoRepeat():
+        if event.key() == Qt.Key_Tab and not event.isAutoRepeat():
             self._set_overlays_visible(True)
             event.accept()
             return
