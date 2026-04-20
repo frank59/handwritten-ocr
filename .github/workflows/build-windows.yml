@@ -41,6 +41,38 @@ jobs:
           echo === Verify PyInstaller installation ===
           pyinstaller --version
 
+      - name: Download PaddleOCR models
+        run: |
+          set MODELS_DIR=%CD%\models
+          mkdir %MODELS_DIR%
+          echo === Downloading PP-OCRv4 detection model ===
+          curl -L -o "%MODELS_DIR%\ch_PP-OCRv4_det_infer.tar" "https://paddleocr.bj.bcebos.com/PP-OCRv4/chinese/ch_PP-OCRv4_det_infer.tar"
+          echo === Downloading PP-OCRv4 recognition model ===
+          curl -L -o "%MODELS_DIR%\ch_PP-OCRv4_rec_infer.tar" "https://paddleocr.bj.bcebos.com/PP-OCRv4/chinese/ch_PP-OCRv4_rec_infer.tar"
+          echo === Downloading angle classification model ===
+          curl -L -o "%MODELS_DIR%\ch_ppocr_mobile_v2.0_cls_infer.tar" "https://paddleocr.bj.bcebos.com/dygraph_v2.0/ch/ch_ppocr_mobile_v2.0_cls_infer.tar"
+          echo === All models downloaded ===
+          dir %MODELS_DIR%
+
+      - name: Extract models
+        run: |
+          set MODELS_DIR=%CD%\models
+          echo === Extract detection model ===
+          tar -xf "%MODELS_DIR%\ch_PP-OCRv4_det_infer.tar" -C "%MODELS_DIR%"
+          echo === Extract recognition model ===
+          tar -xf "%MODELS_DIR%\ch_PP-OCRv4_rec_infer.tar" -C "%MODELS_DIR%"
+          echo === Extract classification model ===
+          tar -xf "%MODELS_DIR%\ch_ppocr_mobile_v2.0_cls_infer.tar" -C "%MODELS_DIR%"
+          echo === Extract complete ===
+          dir %MODELS_DIR%
+
+      - name: Copy text dictionary
+        run: |
+          mkdir %CD%\models\dict
+          copy "%pythonLocation%\Lib\site-packages\ppocr\utils\ppocr_keys_v1.txt" "%CD%\models\dict\"
+          echo === Dictionary copied ===
+          dir %CD%\models\dict\
+
       - name: Build with PyInstaller
         run: |
           pyinstaller build.spec --clean --noconfirm

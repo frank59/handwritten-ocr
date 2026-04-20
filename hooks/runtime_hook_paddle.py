@@ -25,3 +25,10 @@ if hasattr(sys, 'frozen'):
     internal_lib = os.path.join(os.path.dirname(sys.executable), '_internal')
     if os.path.exists(internal_lib):
         os.environ.setdefault('PADDLE_LIB_PATH', internal_lib)
+
+    # Point PaddleOCR to bundled models (downloaded and extracted during CI build)
+    base_dir = os.path.dirname(sys.executable)
+    bundled_models = os.path.join(base_dir, '_internal', 'models')
+    if os.path.exists(bundled_models):
+        os.environ.setdefault('PADDLE_OCR_BASE_DIR', bundled_models)
+

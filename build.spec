@@ -16,6 +16,8 @@ block_cipher = None
 datas = [
     ('src', 'src'),
     ('config.py', '.'),
+    # PaddleOCR 模型文件（已在 CI 中下载并解压）
+    ('models', 'models'),
 ]
 
 # 收集第三方库的数据文件
