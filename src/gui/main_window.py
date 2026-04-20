@@ -149,9 +149,11 @@ class MainWindow(QMainWindow):
         if not file_path:
             return
 
+        logger.info("[ui] 打开图片: %s", file_path)
         try:
             image = load_image(file_path)
         except ImageLoadError as e:
+            logger.error("[ui] 图片加载失败: %s", e)
             show_error(self, "加载失败", str(e))
             return
 
@@ -163,6 +165,7 @@ class MainWindow(QMainWindow):
         self._canvas.set_image(image)
         self._stack.setCurrentIndex(0)
         self._set_state(AppState.IMAGE_LOADED)
+        logger.info("[ui] 图片加载成功: shape=%s", image.shape)
         self.statusBar().showMessage(f"已加载: {os.path.basename(file_path)}")
 
     # --- Rotate ---

@@ -2,8 +2,11 @@
 
 import cv2
 import numpy as np
+import logging
 
 from config import TARGET_LONG_EDGE, MIN_LONG_EDGE
+
+logger = logging.getLogger(__name__)
 
 
 def rotate_90_cw(image: np.ndarray) -> np.ndarray:

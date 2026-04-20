@@ -2,11 +2,14 @@
 
 import os
 from datetime import datetime
+import logging
 
 import pandas as pd
 from openpyxl.utils import get_column_letter
 
 from src.parsing.data_models import ParsedDocument
+
+logger = logging.getLogger(__name__)
 
 
 class ExportError(Exception):

@@ -193,9 +193,9 @@ class TableGenerator:
         num_cols = len(sorted_guides)
         headers = [f"\u5217{i + 1}" for i in range(num_cols)]
 
-        logger.warning("[guide] active_boxes=%d, guides=%d", len(active), num_cols)
+        logger.info("[guide] 生成模式: %d条辅助线, %d个矩形", num_cols, len(active))
         for i, (gid, p1, p2) in enumerate(sorted_guides):
-            logger.warning("[guide]   guide[%d]: (%.1f,%.1f)-(%.1f,%.1f)", i, p1[0], p1[1], p2[0], p2[1])
+            logger.debug("[guide] guide[%d]: (%.1f,%.1f)-(%.1f,%.1f)", i, p1[0], p1[1], p2[0], p2[1])
 
         # 1. Assign boxes to columns by strict intersection
         #    columns[col_idx] = list of TextBox

@@ -3,11 +3,14 @@
 from PySide6.QtCore import QThread, Signal
 
 import numpy as np
+import logging
 
 from src.preprocessing.enhancer import enhance_image
 from src.preprocessing.loader import ImageLoadError
 from src.ocr.detector import TextDetector
 from src.parsing.data_models import OCRResult
+
+logger = logging.getLogger(__name__)
 
 
 class OCRWorker(QThread):

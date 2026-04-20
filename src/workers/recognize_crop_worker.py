@@ -3,9 +3,12 @@
 from PySide6.QtCore import QThread, Signal
 
 import numpy as np
+import logging
 
 from src.parsing.data_models import TextBox
 from src.ocr.recognizer import TextCropRecognizer
+
+logger = logging.getLogger(__name__)
 
 
 class RecognizeCropWorker(QThread):

@@ -4,8 +4,11 @@ import os
 import sys
 import cv2
 import numpy as np
+import logging
 
 from config import SUPPORTED_EXTENSIONS, MAX_FILE_SIZE_MB
+
+logger = logging.getLogger(__name__)
 
 
 class ImageLoadError(Exception):
