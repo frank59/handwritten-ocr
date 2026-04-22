@@ -6,6 +6,9 @@ on:
       - 'mac-v*'  # macOS 打包触发标签，如 mac-v1.0.0
   workflow_dispatch:  # 手动触发
 
+permissions:
+  contents: write  # 需要 write 权限才能创建 Release
+
 jobs:
   build-macos:
     runs-on: macos-14
