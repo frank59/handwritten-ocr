@@ -243,8 +243,5 @@ app = BUNDLE(
         'LSMinimumSystemVersion': '10.15',
         'NSHighResolutionCapable': True,
         'NSPrincipalClass': 'NSApplication',
-        'CFBundleIconFile': None,  # 可设置图标: 'app.icns'
     },
-    icon=None,
-    bundle_identifier=None,
 )
